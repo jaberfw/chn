@@ -8,8 +8,8 @@
 /** Path to the vocabulary database, relative to index.html. */
 const DATABASE_PATH = 'database.json';
 
-/** Levels in canonical display order. 'extra' = words outside the HSK 1-5 core lists. */
-const LEVEL_ORDER = ['1', '2', '3', '4', '5', 'extra'];
+/** Levels in canonical display order. 'Extra' = words outside the HSK 1-5 core lists. */
+const LEVEL_ORDER = ['1', '2', '3', '4', '5', 'Extra'];
 
 /** Every exam offers exactly this many MCQ options per question. */
 const OPTIONS_PER_QUESTION = 4;
@@ -60,9 +60,9 @@ function loadDatabase() {
   return _dbPromise;
 }
 
-/** Human-friendly label for a level key ('1' -> 'HSK 1', 'extra' -> 'Extra'). */
+/** Human-friendly label for a level key ('1' -> 'HSK 1', 'Extra' -> 'Extra'). */
 function levelLabel(level) {
-  return level === 'extra' ? 'Extra' : `HSK ${level}`;
+  return level === 'Extra' ? 'Extra' : `HSK ${level}`;
 }
 
 /** Turns a raw category slug ('daily_life') into a display label ('Daily Life'). */
@@ -128,19 +128,28 @@ const NUMBER_WORD_TO_DIGIT = {
   first: '1st', second: '2nd', third: '3rd',
 };
 
+/** Plain-language meaning of a word in the given display language ('bangla' | 'english'). */
+function meaningInLanguage(word, language) {
+  if (language === 'bangla') {
+    return word.bangla || primaryMeaning(word.english);
+  }
+  return primaryMeaning(word.english);
+}
+
 /**
- * Display text for an MCQ option: the English meaning, except for words in the
- * "numbers" category, which show as numerals (e.g. '7' instead of 'seven') when
- * the meaning maps cleanly to one.
+ * Display text for an MCQ option / flashcard, in the requested display language
+ * ('bangla' | 'english', default 'bangla'), except for words in the "numbers"
+ * category, which show as numerals (e.g. '7') regardless of language when the
+ * English meaning maps cleanly to one.
  */
-function optionLabel(word) {
-  const meaning = primaryMeaning(word.english);
+function optionLabel(word, language = 'bangla') {
   const category = (word.category || '').toLowerCase();
   if (category === 'numbers') {
-    const digit = NUMBER_WORD_TO_DIGIT[meaning.toLowerCase()];
+    const engMeaning = primaryMeaning(word.english).toLowerCase();
+    const digit = NUMBER_WORD_TO_DIGIT[engMeaning];
     if (digit) return digit;
   }
-  return meaning;
+  return meaningInLanguage(word, language);
 }
 
 /** Fisher-Yates shuffle. Returns a new array; does not mutate input. */
@@ -173,9 +182,10 @@ function pickUniqueBy(arr, count, key, excludeKeys) {
  * @param {number} count - number of questions to generate.
  * @param {'random'|'serial'} [order='random'] - 'random' shuffles which words are asked
  *   and in what order; 'serial' keeps the pool's original order (first `count` words).
+ * @param {'bangla'|'english'} [language='bangla'] - language the answer options are shown in.
  * @returns {Array<{word:Object, options:Array, correctKey:string}>}
  */
-function buildExam(pool, count, order = 'random') {
+function buildExam(pool, count, order = 'random', language = 'bangla') {
   const limit = Math.min(count, pool.length);
   const chosenWords = order === 'serial' ? pool.slice(0, limit) : shuffle(pool).slice(0, limit);
   const optionKey = (w) => w.hanzi;
@@ -188,7 +198,7 @@ function buildExam(pool, count, order = 'random') {
       key: optionKey(w),
       hanzi: w.hanzi,
       pinyin: w.pinyin,
-      meaning: optionLabel(w),
+      meaning: optionLabel(w, language),
     }));
 
     return {

@@ -28,12 +28,14 @@
     setup: $('#setup'),
 
     levelChips: $('#level-chips'),
+    levelToggleAll: $('#level-toggle-all'),
     categoryChips: $('#category-chips'),
     categoryFilter: $('#category-filter'),
     catToggleAll: $('#cat-toggle-all'),
     modeToggle: $('#mode-toggle'),
     modeHint: $('#mode-hint'),
     orderToggle: $('#order-toggle'),
+    languageToggle: $('#language-toggle'),
     countChips: $('#count-chips'),
     poolInfo: $('#pool-info'),
     setupError: $('#setup-error'),
@@ -59,6 +61,7 @@
     stamp: $('#stamp'),
     nextBtn: $('#next-btn'),
     quitBtn: $('#quit-btn'),
+    quizHomeBtn: $('#quiz-home-btn'),
 
     resultScore: $('#result-score'),
     resultCorrect: $('#result-correct'),
@@ -77,9 +80,11 @@
     readingProgressLabel: $('#reading-progress-label'),
     readingProgressFill: $('#reading-progress-fill'),
     readingCards: $('#reading-cards'),
+    readingMetaTag: $('#reading-meta-tag'),
     readingPrevBtn: $('#reading-prev-btn'),
     readingNextBtn: $('#reading-next-btn'),
-    readingQuitBtn: $('#reading-quit-btn'),
+    readingExitBtn: $('#reading-exit-btn'),
+    brandHomeBtn: $('#brand-home-btn'),
   };
 
   /* ------------------------------------------------------------------ *
@@ -92,6 +97,7 @@
     categories: new Set(),  // selected category slugs (subset of allCategoriesForLevels)
     mode: null,             // null | 'exam' | 'reading' — nothing selected until the learner picks one
     order: 'random',        // 'random' | 'serial' — order questions/cards are presented in
+    language: 'bangla',     // 'bangla' | 'english' — language Exam options & Reading meanings show in
     questionCount: null,    // null | 10 | 20 | 30 | 50 | 'all'
 
     pool: [],       // words matching current level+category filters
@@ -211,6 +217,33 @@
       btn.addEventListener('click', () => toggleLevel(lvl));
       el.levelChips.appendChild(btn);
     });
+    updateLevelToggleLabel();
+  }
+
+  /** All level keys that actually have words in the database (mirrors renderLevelChips' filter). */
+  function availableLevels() {
+    return LEVEL_ORDER.filter((lvl) => (state.db.levels[lvl] || 0) > 0);
+  }
+
+  function updateLevelToggleLabel() {
+    const all = availableLevels();
+    const allSelected = all.length > 0 && all.every((lvl) => state.levels.has(lvl));
+    el.levelToggleAll.textContent = allSelected ? 'Clear all' : 'Select all';
+  }
+
+  function handleLevelToggleAll() {
+    const all = availableLevels();
+    const allSelected = all.length > 0 && all.every((lvl) => state.levels.has(lvl));
+    if (allSelected) {
+      // Keep at least one level selected — collapse down to just the first.
+      state.levels = new Set(all.slice(0, 1));
+    } else {
+      state.levels = new Set(all);
+    }
+    refreshCategoriesForLevels();
+    renderLevelChips();
+    renderCategoryChips();
+    updatePoolInfo();
   }
 
   function toggleLevel(lvl) {
@@ -354,6 +387,15 @@
     });
   }
 
+  function setLanguage(language) {
+    state.language = language;
+    Array.from(el.languageToggle.children).forEach((btn) => {
+      const active = btn.dataset.language === language;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-checked', String(active));
+    });
+  }
+
   function currentPool() {
     const levelWords = wordsForLevels(state.db.words, state.levels);
     // No category chips checked, or every one checked, both mean "no filter" —
@@ -402,8 +444,8 @@
    * Setup init
    * ------------------------------------------------------------------ */
   function initSetup() {
-    // Nothing is pre-selected when the main page loads — the learner picks
-    // level(s), a mode, and a question count from scratch each visit.
+    // Level(s) still need to be picked by the learner each visit, but mode,
+    // order, and question count default to Reading / Serial / All.
     state.levels = new Set();
     state.categories = new Set();
     state.allCategoriesForLevels = [];
@@ -413,8 +455,11 @@
     renderLevelChips();
     renderCategoryChips();
     renderCountChips();
-    setMode(null);
-    setOrder('random');
+    setMode('reading');
+    setOrder('serial');
+    setLanguage('bangla');
+    state.questionCount = 'all';
+    renderCountChips();
     updatePoolInfo();
   }
 
@@ -435,7 +480,7 @@
     const total = state.questions.length;
 
     el.progressLabel.textContent = `Question ${state.index + 1} of ${total}`;
-    el.progressFill.style.width = `${(state.index / total) * 100}%`;
+    el.progressFill.style.width = `${((state.index + 1) / total) * 100}%`;
     el.quizLevelTag.textContent = levelLabel(q.word.level);
 
     el.feedback.hidden = true;
@@ -628,7 +673,7 @@
 
       details.innerHTML = `
         <span class="review-index">Q${i + 1}</span>
-        <span class="review-correct">${escapeHtml(answer.word.hanzi)} · ${escapeHtml(answer.word.pinyin)} — ${escapeHtml(primaryMeaning(answer.word.english))}</span>
+        <span class="review-correct">${escapeHtml(answer.word.hanzi)} · ${escapeHtml(answer.word.pinyin)} — ${escapeHtml(optionLabel(answer.word, state.language))}</span>
         ${answer.isCorrect ? '<span class="review-tag review-tag--correct">Correct</span>' : chosenLabel}
       `;
 
@@ -663,7 +708,7 @@
     }
     el.setupError.hidden = true;
 
-    state.questions = buildExam(state.pool, resolvedCount(), state.order);
+    state.questions = buildExam(state.pool, resolvedCount(), state.order, state.language);
     state.index = 0;
     state.answers = [];
     state.locked = false;
@@ -675,7 +720,7 @@
   }
 
   function startAnotherExamSameRange() {
-    state.questions = buildExam(state.pool, resolvedCount(), state.order);
+    state.questions = buildExam(state.pool, resolvedCount(), state.order, state.language);
     state.index = 0;
     state.answers = [];
     state.locked = false;
@@ -707,6 +752,7 @@
     state.readingWords = buildReadingSession(state.pool, resolvedCount(), state.order);
     state.readingIndex = 0;
 
+    el.readingMetaTag.textContent = readingSessionMetaText();
     el.readingProgressFill.parentElement.setAttribute('aria-valuemax', String(totalReadingPages()));
 
     showScreen('reading');
@@ -715,6 +761,20 @@
 
   function totalReadingPages() {
     return Math.max(1, Math.ceil(state.readingWords.length / READING_PAGE_SIZE));
+  }
+
+  /** Builds the "HSK 1, 2 · Category · 20 words" summary shown next to the reading page number. */
+  function readingSessionMetaText() {
+    const levelText = LEVEL_ORDER.filter((lvl) => state.levels.has(lvl)).map(levelLabel).join(', ');
+    const noFilter = state.categories.size === 0 || state.categories.size === state.allCategoriesForLevels.length;
+    const catNames = Array.from(state.categories).map(prettyCategory);
+    const categoryText = noFilter
+      ? 'All categories'
+      : catNames.length <= 2
+        ? catNames.join(', ')
+        : `${catNames.length} categories`;
+    const amount = state.readingWords.length;
+    return `${levelText} · ${categoryText} · ${amount} word${amount === 1 ? '' : 's'}`;
   }
 
   function stopReadingAudio() {
@@ -727,7 +787,7 @@
     const pageWords = state.readingWords.slice(start, start + READING_PAGE_SIZE);
 
     el.readingProgressLabel.textContent = `Page ${state.readingIndex + 1} of ${total} · Words ${start + 1}–${start + pageWords.length} of ${state.readingWords.length}`;
-    el.readingProgressFill.style.width = `${(state.readingIndex / total) * 100}%`;
+    el.readingProgressFill.style.width = `${((state.readingIndex + 1) / total) * 100}%`;
 
     el.readingCards.innerHTML = '';
     pageWords.forEach((word) => {
@@ -737,12 +797,17 @@
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-label', `Play pronunciation for ${word.hanzi}`);
 
+      const primaryText = optionLabel(word, state.language);
+      const secondaryText = state.language === 'bangla'
+        ? primaryMeaning(word.english)
+        : (word.bangla || '');
+
       card.innerHTML = `
         <span class="reading-card-hanzi">${escapeHtml(word.hanzi)}</span>
         <div class="reading-card-body">
           <span class="reading-card-pinyin">${escapeHtml(word.pinyin)}</span>
-          <span class="reading-card-meaning">${escapeHtml(optionLabel(word))}</span>
-          <span class="reading-card-level">${escapeHtml(levelLabel(word.level))}</span>
+          <span class="reading-card-meaning">${escapeHtml(primaryText)}</span>
+          ${secondaryText ? `<span class="reading-card-bangla">${escapeHtml(secondaryText)}</span>` : ''}
         </div>
         <span class="reading-card-play" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" width="100%" height="100%"><path d="M6 9v6h3.5l4.5 4V5l-4.5 4H6Z" fill="currentColor" /><path d="M17 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
@@ -812,6 +877,7 @@
     el.themeToggle.addEventListener('click', toggleTheme);
     el.startBtn.addEventListener('click', startSession);
 
+    el.levelToggleAll.addEventListener('click', handleLevelToggleAll);
     el.catToggleAll.addEventListener('click', handleCatToggleAll);
     el.categoryFilter.addEventListener('input', renderCategoryChips);
 
@@ -823,9 +889,17 @@
       btn.addEventListener('click', () => setOrder(btn.dataset.order));
     });
 
+    Array.from(el.languageToggle.children).forEach((btn) => {
+      btn.addEventListener('click', () => setLanguage(btn.dataset.language));
+    });
+
     el.playBtn.addEventListener('click', playCurrentAudio);
     el.nextBtn.addEventListener('click', handleNext);
     el.quitBtn.addEventListener('click', () => {
+      showScreen('start');
+      renderStartStats();
+    });
+    el.quizHomeBtn.addEventListener('click', () => {
       showScreen('start');
       renderStartStats();
     });
@@ -839,13 +913,19 @@
     });
     el.reviewBackBtn.addEventListener('click', () => showScreen('result'));
 
+    el.brandHomeBtn.addEventListener('click', () => {
+      stopReadingAudio();
+      showScreen('start');
+      renderStartStats();
+    });
+
     el.playBtn.addEventListener('keyup', (e) => {
       if (e.key === ' ' || e.key === 'Enter') playCurrentAudio();
     });
 
     el.readingNextBtn.addEventListener('click', handleReadingNext);
     el.readingPrevBtn.addEventListener('click', handleReadingPrev);
-    el.readingQuitBtn.addEventListener('click', quitReading);
+    el.readingExitBtn.addEventListener('click', quitReading);
   }
 
   /* ------------------------------------------------------------------ *

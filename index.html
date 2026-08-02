@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>听说汉语 · HSK Vocabulary Quiz</title>
+<title>HSK Vocabulary Quiz</title>
 <meta name="description" content="Practice HSK 1-5 Chinese vocabulary with an Exam mode and a Reading mode, filterable by level and category." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
 <header class="app-header">
-  <div class="brand">
-    <span class="brand-seal" aria-hidden="true">听</span>
+  <button id="brand-home-btn" class="brand" type="button" aria-label="Go to home page">
+    <span class="brand-seal" aria-hidden="true">H</span>
     <div class="brand-text">
-      <span class="brand-title">听说汉语</span>
+      <span class="brand-title">HSK Vocabulary</span>
       <span class="brand-subtitle">HSK Vocabulary Quiz</span>
     </div>
-  </div>
+  </button>
   <button id="theme-toggle" class="icon-btn" type="button" aria-pressed="false" aria-label="Switch to dark mode">
     <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.4 5.6l-1.4 1.4M7 17l-1.4 1.4M18.4 18.4L17 17M7 7 5.6 5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
@@ -32,7 +32,7 @@
   <section id="screen-start" class="screen active" aria-labelledby="start-heading">
     <div class="panel start-panel">
       <p class="eyebrow">HSK 1–5 · Exam &amp; Reading practice</p>
-      <h1 id="start-heading">Train your ear &amp; eye for<br /><span class="hero-hanzi">中文词汇</span></h1>
+      <h1 id="start-heading">Train your ear &amp; eye for<br /><span class="hero-hanzi">Chinese Vocabulary</span></h1>
       <p class="lede">
         Pick an HSK level, narrow it down by category if you like, choose a
         mode, and start a session built from the matching words.
@@ -46,6 +46,7 @@
         <div class="setup-section">
           <div class="setup-row">
             <h3>Level</h3>
+            <button id="level-toggle-all" class="link-btn" type="button">Select all</button>
           </div>
           <div id="level-chips" class="chip-group" role="group" aria-label="HSK level"></div>
         </div>
@@ -59,30 +60,44 @@
           <div id="category-chips" class="chip-group chip-group--wrap category-scroll" role="group" aria-label="Word categories"></div>
         </div>
 
-        <div class="setup-section">
-          <h3>Mode</h3>
-          <div id="mode-toggle" class="segmented" role="radiogroup" aria-label="Practice mode">
-            <button class="segmented-btn" data-mode="exam" type="button" role="radio" aria-checked="false">
-              <span class="segmented-icon" aria-hidden="true">🔊</span> Exam
-            </button>
-            <button class="segmented-btn" data-mode="reading" type="button" role="radio" aria-checked="false">
-              <span class="segmented-icon" aria-hidden="true">📖</span> Reading
-            </button>
+        <div class="setup-triple">
+          <div class="setup-section setup-third">
+            <h3>Mode</h3>
+            <div id="mode-toggle" class="segmented segmented--triple" role="radiogroup" aria-label="Practice mode">
+              <button class="segmented-btn" data-mode="exam" type="button" role="radio" aria-checked="false">
+                <span class="segmented-icon" aria-hidden="true">🔊</span> Exam
+              </button>
+              <button class="segmented-btn" data-mode="reading" type="button" role="radio" aria-checked="false">
+                <span class="segmented-icon" aria-hidden="true">📖</span> Reading
+              </button>
+            </div>
           </div>
-          <p class="mode-hint" id="mode-hint">Choose a mode to continue.</p>
-        </div>
 
-        <div class="setup-section">
-          <h3>Order</h3>
-          <div id="order-toggle" class="segmented" role="radiogroup" aria-label="Question order">
-            <button class="segmented-btn is-active" data-order="random" type="button" role="radio" aria-checked="true">
-              <span class="segmented-icon" aria-hidden="true">🔀</span> Random
-            </button>
-            <button class="segmented-btn" data-order="serial" type="button" role="radio" aria-checked="false">
-              <span class="segmented-icon" aria-hidden="true">📋</span> Serial
-            </button>
+          <div class="setup-section setup-third">
+            <h3>Order</h3>
+            <div id="order-toggle" class="segmented segmented--triple" role="radiogroup" aria-label="Question order">
+              <button class="segmented-btn is-active" data-order="random" type="button" role="radio" aria-checked="true">
+                <span class="segmented-icon" aria-hidden="true">🔀</span> Random
+              </button>
+              <button class="segmented-btn" data-order="serial" type="button" role="radio" aria-checked="false">
+                <span class="segmented-icon" aria-hidden="true">📋</span> Serial
+              </button>
+            </div>
+          </div>
+
+          <div class="setup-section setup-third">
+            <h3>Language</h3>
+            <div id="language-toggle" class="segmented segmented--triple" role="radiogroup" aria-label="Meaning display language">
+              <button class="segmented-btn is-active" data-language="bangla" type="button" role="radio" aria-checked="true">
+                <span class="segmented-icon" aria-hidden="true">🇧🇩</span> বাংলা
+              </button>
+              <button class="segmented-btn" data-language="english" type="button" role="radio" aria-checked="false">
+                <span class="segmented-icon" aria-hidden="true">🇬🇧</span> English
+              </button>
+            </div>
           </div>
         </div>
+        <p class="mode-hint" id="mode-hint">Choose a mode to continue.</p>
 
         <div class="setup-section">
           <h3>Questions</h3>
@@ -158,6 +173,9 @@
       <div class="quiz-actions">
         <button id="next-btn" class="btn btn-primary btn-lg" type="button" disabled>Next question</button>
       </div>
+      <div class="quiz-actions">
+        <button id="quiz-home-btn" class="btn btn-ghost btn-lg" type="button">Back to home</button>
+      </div>
     </div>
 
     <div id="stamp" class="stamp" aria-hidden="true"></div>
@@ -168,8 +186,10 @@
     <div class="panel reading-panel">
       <div class="quiz-top">
         <h2 id="reading-heading" class="sr-only">Reading session</h2>
-        <p id="reading-progress-label" class="progress-label">Page 1 of 1</p>
-        <button id="reading-quit-btn" class="btn btn-ghost btn-sm" type="button">End session</button>
+        <div class="quiz-top-left">
+          <p id="reading-progress-label" class="progress-label">Page 1 of 1</p>
+          <span id="reading-meta-tag" class="level-tag">HSK 1</span>
+        </div>
       </div>
 
       <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="1" aria-labelledby="reading-progress-label">
@@ -183,6 +203,9 @@
       <div class="quiz-actions reading-actions">
         <button id="reading-prev-btn" class="btn btn-secondary btn-lg" type="button">Previous</button>
         <button id="reading-next-btn" class="btn btn-primary btn-lg" type="button">Next page</button>
+      </div>
+      <div class="quiz-actions">
+        <button id="reading-exit-btn" class="btn btn-ghost btn-lg" type="button">Back to home</button>
       </div>
     </div>
   </section>
@@ -242,7 +265,7 @@
 </main>
 
 <footer class="app-footer">
-  <p>Audio files are read from the path in <code>database.json</code>, e.g. <code>audio/hsk1/电话.mp3</code>. Built with HTML, CSS &amp; vanilla JS.</p>
+  <p>Design and Develop by <a href="https://fb.com/jaber5717" target="_blank" rel="noopener noreferrer">JA JONY</a></p>
 </footer>
 
 <script src="data.js"></script>

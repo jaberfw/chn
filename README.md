@@ -1,7 +1,7 @@
 # HSK Vocabulary Quiz
 
 A production-ready, framework-free listening + reading quiz built from
-`database.json` — an HSK 1–5 (+ extra) Chinese vocabulary set with per-word
+`database.json` — an HSK 1–5 (+ Extra) Chinese vocabulary set with per-word
 audio, categories, and example sentences.
 
 ## Run it
@@ -20,7 +20,7 @@ in `database.json` — e.g. `audio/hsk1/电话.mp3`. If a file is missing, the
 play button shows an inline hint instead of failing silently.
 
 ## What's new in this update
-- **Database-driven**: reads `database.json` (HSK 1–5 + extra, ~3,960 words)
+- **Database-driven**: reads `database.json` (HSK 1–5 + Extra, ~3,960 words)
   instead of a fixed number range.
 - **Level & category filters** on the home screen — pick one or more HSK
   levels, then narrow further by category (with a search box, since some

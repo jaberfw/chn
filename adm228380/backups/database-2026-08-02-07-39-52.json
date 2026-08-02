@@ -56763,34 +56763,34 @@
         {
             "id": 3776,
             "level": "Extra",
+            "category": "money",
+            "topic": "World Currencies",
             "hanzi": "韩元",
             "traditional": "韓元",
             "pinyin": "hányuán",
             "bangla_pronunciation": "হআনইউয়েন",
             "english": "South Korean won",
-            "bangla": "দক্ষিন কোরিয়ান ওন",
-            "category": "money",
+            "bangla": "সআউথ করিন ওওন",
             "part_of_speech": "noun",
-            "audio": "audio/韩元.mp3",
             "stroke_count": 16,
-            "radical": "",
-            "examples": []
+            "audio": "audio/韩元.mp3",
+            "is_hsk": false
         },
         {
             "id": 3777,
             "level": "Extra",
+            "category": "money",
+            "topic": "World Currencies",
             "hanzi": "港币",
             "traditional": "港幣",
             "pinyin": "gǎngbì",
             "bangla_pronunciation": "গআংবি",
             "english": "Hong Kong dollar",
             "bangla": "হওনগ কওনগ ডওললআর",
-            "category": "money",
             "part_of_speech": "noun",
-            "audio": "audio/港币.mp3",
             "stroke_count": 24,
-            "radical": "",
-            "examples": []
+            "audio": "audio/港币.mp3",
+            "is_hsk": false
         },
         {
             "id": 3778,
