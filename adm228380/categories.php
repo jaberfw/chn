@@ -1,1 +1,0 @@
-<?php require_once __DIR__.'/functions.php';layout_header('Categories');$s=stats(load_db());?><div class="panel"><h2>Categories</h2><table class="table"><tr><th>Category</th><th>Words</th></tr><?php foreach($s['categories'] as $c=>$n):?><tr><td><?=h($c)?></td><td><?=h($n)?></td></tr><?php endforeach;?></table></div><?php layout_footer();?>

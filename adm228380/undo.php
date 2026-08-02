@@ -1,1 +1,0 @@
-<?php require_once __DIR__.'/functions.php';require_login();$b=list_backups();if($b)copy($b[0],DATABASE_PATH);header('Location: settings.php'); ?>
