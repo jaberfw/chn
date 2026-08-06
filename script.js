@@ -16,6 +16,7 @@
     start: $('#screen-start'),
     quiz: $('#screen-quiz'),
     reading: $('#screen-reading'),
+    listen: $('#screen-listen'),
     result: $('#screen-result'),
     review: $('#screen-review'),
   };
@@ -37,6 +38,9 @@
     orderToggle: $('#order-toggle'),
     languageToggle: $('#language-toggle'),
     countChips: $('#count-chips'),
+    countHeading: $('#count-heading'),
+    repeatSection: $('#repeat-section'),
+    repeatChips: $('#repeat-chips'),
     poolInfo: $('#pool-info'),
     setupError: $('#setup-error'),
     startBtn: $('#start-btn'),
@@ -85,6 +89,26 @@
     readingNextBtn: $('#reading-next-btn'),
     readingExitBtn: $('#reading-exit-btn'),
     brandHomeBtn: $('#brand-home-btn'),
+
+    listenProgressLabel: $('#listen-progress-label'),
+    listenProgressFill: $('#listen-progress-fill'),
+    listenLevelTag: $('#listen-level-tag'),
+    listenPillZh: $('#listen-pill-zh'),
+    listenPillEn: $('#listen-pill-en'),
+    listenRepeatBadge: $('#listen-repeat-badge'),
+    listenHanzi: $('#listen-hanzi'),
+    listenPinyin: $('#listen-pinyin'),
+    listenMeaning: $('#listen-meaning'),
+    listenSecondary: $('#listen-secondary'),
+    listenCategoryTag: $('#listen-category-tag'),
+    listenHint: $('#listen-hint'),
+    listenPrevBtn: $('#listen-prev-btn'),
+    listenPlayPauseBtn: $('#listen-playpause-btn'),
+    listenPlayIcon: $('#listen-play-icon'),
+    listenPauseIcon: $('#listen-pause-icon'),
+    listenNextBtn: $('#listen-next-btn'),
+    listenQuitBtn: $('#listen-quit-btn'),
+    listenHomeBtn: $('#listen-home-btn'),
   };
 
   /* ------------------------------------------------------------------ *
@@ -99,6 +123,8 @@
     order: 'random',        // 'random' | 'serial' — order questions/cards are presented in
     language: 'bangla',     // 'bangla' | 'english' — language Exam options & Reading meanings show in
     questionCount: null,    // null | 10 | 20 | 30 | 50 | 'all'
+    listenRangeId: DEFAULT_LISTEN_RANGE_ID, // which batch of the pool Listen mode plays (10 / 10-20 / … / all)
+    repeatCount: DEFAULT_REPEAT_COUNT, // how many times each word's zh+meaning pair plays (Listen mode)
 
     pool: [],       // words matching current level+category filters
     questions: [],  // built exam: [{word, options, correctKey}]
@@ -109,6 +135,15 @@
     readingWords: [],    // words for the current Reading session
     readingIndex: 0,     // current page index (0-based)
     readingAudioToken: 0, // bumped to cancel a card's in-flight audio when the page changes
+
+    listenWords: [],      // words for the current Listen session
+    listenIndex: 0,       // current word index within listenWords
+    listenRepeatIndex: 0, // how many zh+en pairs already played for this word (0-based)
+    listenStage: 'zh',    // 'zh' | 'en' — 'en' means the meaning clip (Bangla or English)
+    listenPlaying: false, // true while the auto-advancing chain is actively running (not paused)
+    listenToken: 0,       // bumped to cancel any in-flight audio callback chain
+    listenAudio: null,    // the current Audio object, so pause/resume/stop can reach it
+    listenAudioCleanup: null, // detaches the current clip's listeners when playback is cut short
   };
 
   /* ------------------------------------------------------------------ *
@@ -340,6 +375,30 @@
 
   function renderCountChips() {
     el.countChips.innerHTML = '';
+
+    // Listen mode studies a batch of the list (words 1-10, 10-20, …, or All)
+    // rather than a plain question count, so it gets its own chips.
+    if (state.mode === 'listen') {
+      LISTEN_RANGE_CHOICES.forEach((range) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip';
+        btn.dataset.range = range.id;
+        const active = state.listenRangeId === range.id;
+        btn.setAttribute('aria-pressed', String(active));
+        btn.classList.toggle('is-active', active);
+        btn.textContent = range.label;
+        btn.addEventListener('click', () => {
+          state.listenRangeId = range.id;
+          renderCountChips();
+          updatePoolInfo();
+          warmListenRange();
+        });
+        el.countChips.appendChild(btn);
+      });
+      return;
+    }
+
     QUESTION_COUNT_CHOICES.forEach((count) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -358,6 +417,25 @@
     });
   }
 
+  function renderRepeatChips() {
+    el.repeatChips.innerHTML = '';
+    REPEAT_COUNT_CHOICES.forEach((count) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip';
+      btn.dataset.repeat = String(count);
+      const active = state.repeatCount === count;
+      btn.setAttribute('aria-pressed', String(active));
+      btn.classList.toggle('is-active', active);
+      btn.textContent = `${count}×`;
+      btn.addEventListener('click', () => {
+        state.repeatCount = count;
+        renderRepeatChips();
+      });
+      el.repeatChips.appendChild(btn);
+    });
+  }
+
   function setMode(mode) {
     state.mode = mode;
     Array.from(el.modeToggle.children).forEach((btn) => {
@@ -371,11 +449,23 @@
     } else if (mode === 'exam') {
       el.modeHint.textContent = 'Listen to the audio, then pick the matching word.';
       el.startBtn.textContent = 'Start exam';
+    } else if (mode === 'listen') {
+      el.modeHint.textContent = `Hear each word in Chinese, then straight away in ${languageLabel()} — plays continuously until you stop it.`;
+      el.startBtn.textContent = 'Start listening';
     } else {
       el.modeHint.textContent = 'Choose a mode to continue.';
       el.startBtn.textContent = 'Start';
     }
+    el.repeatSection.hidden = mode !== 'listen';
+    el.countHeading.textContent = mode === 'listen' ? 'How many words' : 'Questions';
+    renderCountChips();
     updatePoolInfo();
+    warmListenRange();
+  }
+
+  /** Display name of the currently selected meaning language. */
+  function languageLabel() {
+    return state.language === 'bangla' ? 'বাংলা' : 'English';
   }
 
   function setOrder(order) {
@@ -394,6 +484,13 @@
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-checked', String(active));
     });
+    // Listen mode plays (and labels) the meaning clip in this language, so its
+    // hint and stage pill have to follow the switch.
+    if (state.mode === 'listen') {
+      el.modeHint.textContent = `Hear each word in Chinese, then straight away in ${languageLabel()} — plays continuously until you stop it.`;
+      warmListenRange();
+    }
+    if (el.listenPillEn) el.listenPillEn.textContent = languageLabel();
   }
 
   function currentPool() {
@@ -419,6 +516,22 @@
       el.startBtn.disabled = true;
       return;
     }
+    // Listen mode picks a batch of the list, so its readout talks in ranges.
+    if (state.mode === 'listen') {
+      const range = listenRangeById(state.listenRangeId);
+      const batch = sliceByRange(state.pool, range).length;
+      if (batch < 1) {
+        el.poolInfo.textContent = `${size} word${size === 1 ? '' : 's'} match — nothing in the ${range.label} range. Pick a lower range.`;
+        el.startBtn.disabled = true;
+        return;
+      }
+      el.poolInfo.textContent = range.id === 'all'
+        ? `${size} words match — listening to all ${batch}.`
+        : `${size} words match — listening to words ${range.start}–${Math.min(range.end, size)} (${batch} word${batch === 1 ? '' : 's'}).`;
+      el.startBtn.disabled = false;
+      return;
+    }
+
     if (!state.questionCount) {
       el.poolInfo.textContent = `${size} word${size === 1 ? '' : 's'} match. Choose how many words to practice.`;
       el.startBtn.disabled = true;
@@ -451,10 +564,13 @@
     state.allCategoriesForLevels = [];
     state.mode = null;
     state.questionCount = null;
+    state.listenRangeId = DEFAULT_LISTEN_RANGE_ID;
+    state.repeatCount = DEFAULT_REPEAT_COUNT;
 
     renderLevelChips();
     renderCategoryChips();
     renderCountChips();
+    renderRepeatChips();
     setMode('reading');
     setOrder('serial');
     setLanguage('bangla');
@@ -695,6 +811,8 @@
     state.pool = currentPool();
     if (state.mode === 'reading') {
       startReadingSession();
+    } else if (state.mode === 'listen') {
+      startListenSession();
     } else {
       startExamSession();
     }
@@ -864,6 +982,274 @@
     renderReadingPage();
   }
 
+  /* ------------------------------------------------------------------ *
+   * Listen mode: continuous Chinese -> English playback, repeated N times
+   * per word, auto-advancing through the whole list and looping back to
+   * the start — keeps going until the learner pauses, skips home, or stops.
+   * ------------------------------------------------------------------ */
+  function startListenSession() {
+    if (state.pool.length < 1) {
+      el.setupError.textContent = 'Not enough words match this selection.';
+      el.setupError.hidden = false;
+      return;
+    }
+    el.setupError.hidden = true;
+
+    const range = listenRangeById(state.listenRangeId);
+    state.listenWords = buildListenSession(state.pool, range, state.order);
+    if (!state.listenWords.length) {
+      el.setupError.textContent = `No words in the ${range.label} range — pick a lower range.`;
+      el.setupError.hidden = false;
+      return;
+    }
+
+    state.listenIndex = 0;
+    state.listenRepeatIndex = 0;
+    state.listenStage = 'zh';
+    state.listenPlaying = true;
+
+    el.listenProgressFill.parentElement.setAttribute('aria-valuemax', String(state.listenWords.length));
+    setListenPlayPauseUI(true);
+    el.listenHint.textContent = `Playing continuously — 中文 then ${languageLabel()}, until you pause or stop.`;
+
+    // Buffer the first few clips up front so the very first hand-off is instant.
+    primeListenAudio(0);
+
+    showScreen('listen');
+    renderListenWord();
+    advanceListenPlayback();
+  }
+
+  /** Renders the current word's card + progress, independent of which audio is playing. */
+  function renderListenWord() {
+    const word = state.listenWords[state.listenIndex];
+    if (!word) return;
+
+    el.listenProgressLabel.textContent = `Word ${state.listenIndex + 1} of ${state.listenWords.length}`;
+    el.listenProgressFill.style.width = `${((state.listenIndex + 1) / state.listenWords.length) * 100}%`;
+    el.listenLevelTag.textContent = levelLabel(word.level);
+    el.listenRepeatBadge.textContent = `Repeat ${state.listenRepeatIndex + 1}/${state.repeatCount}`;
+
+    el.listenHanzi.textContent = word.hanzi;
+    el.listenPinyin.textContent = word.pinyin;
+    el.listenMeaning.textContent = optionLabel(word, state.language);
+    const secondary = state.language === 'bangla' ? primaryMeaning(word.english) : (word.bangla || '');
+    el.listenSecondary.textContent = secondary;
+    el.listenSecondary.hidden = !secondary;
+    el.listenCategoryTag.textContent = prettyCategory(word.category);
+
+    updateListenStagePills();
+  }
+
+  function updateListenStagePills() {
+    el.listenPillEn.textContent = languageLabel();
+    el.listenPillZh.classList.toggle('is-active', state.listenStage === 'zh');
+    el.listenPillEn.classList.toggle('is-active', state.listenStage === 'en');
+  }
+
+  function setListenPlayPauseUI(playing) {
+    el.listenPlayPauseBtn.classList.toggle('playing', playing);
+    el.listenPlayPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    el.listenPauseIcon.hidden = !playing;
+    el.listenPlayIcon.hidden = playing;
+  }
+
+  /* Preloaded <audio> elements keyed by src. Reusing already-buffered elements is
+   * what makes the 中文 → বাংলা/English hand-off instant: nothing has to be fetched
+   * or decoded at the moment the first clip ends. */
+  const audioCache = new Map();
+  const AUDIO_CACHE_LIMIT = 150;
+
+  /** Returns a buffered Audio element for `src`, creating and warming it if needed. */
+  function preloadedAudio(src) {
+    if (!src) return null;
+    let audio = audioCache.get(src);
+    if (!audio) {
+      audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = src;
+      audio.load();
+      audioCache.set(src, audio);
+      if (audioCache.size > AUDIO_CACHE_LIMIT) {
+        const oldest = audioCache.keys().next().value;
+        if (oldest !== src) audioCache.delete(oldest);
+      }
+    }
+    return audio;
+  }
+
+  /** The meaning clip that follows the Chinese one: Bangla when বাংলা is picked, else English. */
+  function listenMeaningSrc(word) {
+    return meaningAudioPath(word, state.language) || enAudioPath(word);
+  }
+
+  /**
+   * Pre-buffers the opening clips of the batch that's currently selected on the
+   * start screen, so even the session's *first* 中文 → meaning hand-off is instant
+   * rather than waiting on a first download.
+   */
+  function warmListenRange() {
+    if (state.mode !== 'listen' || !state.pool.length) return;
+    const batch = sliceByRange(state.pool, listenRangeById(state.listenRangeId));
+    batch.slice(0, 3).forEach((word) => {
+      preloadedAudio(zhAudioPath(word));
+      preloadedAudio(listenMeaningSrc(word));
+    });
+  }
+
+  /** Warms up the next few clips the Listen chain will need, so playback never waits. */
+  function primeListenAudio(startIndex) {
+    const words = state.listenWords;
+    if (!words.length) return;
+    for (let i = 0; i < 3; i += 1) {
+      const word = words[(startIndex + i) % words.length];
+      if (!word) continue;
+      preloadedAudio(zhAudioPath(word));
+      preloadedAudio(listenMeaningSrc(word));
+    }
+  }
+
+  /** Stops any in-flight audio and invalidates its callbacks, without changing position. */
+  function haltListenAudio() {
+    state.listenToken += 1;
+    if (state.listenAudioCleanup) {
+      state.listenAudioCleanup();
+      state.listenAudioCleanup = null;
+    }
+    if (state.listenAudio) {
+      state.listenAudio.pause();
+      state.listenAudio = null;
+    }
+  }
+
+  /**
+   * Plays the current stage's audio for the current word, then — if still
+   * playing — moves to the next stage/word/loop and calls itself again.
+   * This single chain is what makes playback continue unattended.
+   */
+  function advanceListenPlayback() {
+    if (!state.listenPlaying) return;
+    const word = state.listenWords[state.listenIndex];
+    if (!word) return;
+
+    renderListenWord();
+
+    const isZh = state.listenStage === 'zh';
+    const token = state.listenToken;
+
+    // Buffer what plays next *while* this clip is playing, so the next one can
+    // start the instant this one ends.
+    if (isZh) preloadedAudio(listenMeaningSrc(word));
+    else primeListenAudio(state.listenIndex + 1);
+
+    const step = () => {
+      if (token !== state.listenToken) return; // superseded by pause/skip/stop
+      state.listenAudio = null;
+      state.listenAudioCleanup = null;
+
+      if (state.listenStage === 'zh') {
+        state.listenStage = 'en';
+      } else {
+        state.listenStage = 'zh';
+        state.listenRepeatIndex += 1;
+        if (state.listenRepeatIndex >= state.repeatCount) {
+          state.listenRepeatIndex = 0;
+          state.listenIndex += 1;
+          if (state.listenIndex >= state.listenWords.length) {
+            state.listenIndex = 0; // loop back to the start — keeps playing until stopped
+          }
+        }
+      }
+
+      if (state.listenPlaying) advanceListenPlayback();
+    };
+
+    /**
+     * Plays `src` and chains on. If a Bangla clip is missing from audiobng/, it
+     * falls back to the English one so a gap in the folder never stalls playback.
+     */
+    const playSrc = (src, fallbackSrc) => {
+      const giveUp = () => {
+        if (fallbackSrc) {
+          playSrc(fallbackSrc, null);
+          return;
+        }
+        el.listenHint.textContent = `Audio unavailable for ${word.hanzi} (${src || 'no file'}) — continuing.`;
+        step();
+      };
+
+      const audio = preloadedAudio(src);
+      if (!audio || audio.error) {
+        if (src) audioCache.delete(src);
+        giveUp();
+        return;
+      }
+
+      let settled = false;
+      const cleanup = () => {
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+      };
+      function onEnded() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        step();
+      }
+      function onError() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        audioCache.delete(src);
+        giveUp();
+      }
+
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError);
+      state.listenAudio = audio;
+      state.listenAudioCleanup = cleanup;
+
+      try { audio.currentTime = 0; } catch (e) { /* not seekable yet — it starts at 0 anyway */ }
+      const started = audio.play();
+      if (started && typeof started.catch === 'function') started.catch(onError);
+    };
+
+    // Bangla learners fall back to the English clip if the Bangla file is missing.
+    const fallback = !isZh && state.language === 'bangla' ? enAudioPath(word) : null;
+    playSrc(isZh ? zhAudioPath(word) : listenMeaningSrc(word), fallback);
+  }
+
+  function toggleListenPlayPause() {
+    if (state.listenPlaying) {
+      state.listenPlaying = false;
+      haltListenAudio();
+      setListenPlayPauseUI(false);
+      el.listenHint.textContent = 'Paused — press play to continue.';
+    } else {
+      state.listenPlaying = true;
+      setListenPlayPauseUI(true);
+      el.listenHint.textContent = `Playing continuously — 中文 then ${languageLabel()}, until you pause or stop.`;
+      advanceListenPlayback();
+    }
+  }
+
+  function skipListenWord(direction) {
+    haltListenAudio();
+    const total = state.listenWords.length;
+    state.listenIndex = (state.listenIndex + direction + total) % total;
+    state.listenRepeatIndex = 0;
+    state.listenStage = 'zh';
+    renderListenWord();
+    if (state.listenPlaying) advanceListenPlayback();
+  }
+
+  function stopListenSession() {
+    state.listenPlaying = false;
+    haltListenAudio();
+    showScreen('start');
+    renderStartStats();
+  }
+
   function quitReading() {
     stopReadingAudio();
     showScreen('start');
@@ -915,6 +1301,8 @@
 
     el.brandHomeBtn.addEventListener('click', () => {
       stopReadingAudio();
+      state.listenPlaying = false;
+      haltListenAudio();
       showScreen('start');
       renderStartStats();
     });
@@ -926,6 +1314,12 @@
     el.readingNextBtn.addEventListener('click', handleReadingNext);
     el.readingPrevBtn.addEventListener('click', handleReadingPrev);
     el.readingExitBtn.addEventListener('click', quitReading);
+
+    el.listenPlayPauseBtn.addEventListener('click', toggleListenPlayPause);
+    el.listenPrevBtn.addEventListener('click', () => skipListenWord(-1));
+    el.listenNextBtn.addEventListener('click', () => skipListenWord(1));
+    el.listenQuitBtn.addEventListener('click', stopListenSession);
+    el.listenHomeBtn.addEventListener('click', stopListenSession);
   }
 
   /* ------------------------------------------------------------------ *

@@ -63,12 +63,15 @@
         <div class="setup-triple">
           <div class="setup-section setup-third">
             <h3>Mode</h3>
-            <div id="mode-toggle" class="segmented segmented--triple" role="radiogroup" aria-label="Practice mode">
+            <div id="mode-toggle" class="segmented segmented--triple segmented--3col" role="radiogroup" aria-label="Practice mode">
               <button class="segmented-btn" data-mode="exam" type="button" role="radio" aria-checked="false">
                 <span class="segmented-icon" aria-hidden="true">🔊</span> Exam
               </button>
               <button class="segmented-btn" data-mode="reading" type="button" role="radio" aria-checked="false">
                 <span class="segmented-icon" aria-hidden="true">📖</span> Reading
+              </button>
+              <button class="segmented-btn" data-mode="listen" type="button" role="radio" aria-checked="false">
+                <span class="segmented-icon" aria-hidden="true">🎧</span> Listen
               </button>
             </div>
           </div>
@@ -100,8 +103,13 @@
         <p class="mode-hint" id="mode-hint">Choose a mode to continue.</p>
 
         <div class="setup-section">
-          <h3>Questions</h3>
+          <h3 id="count-heading">Questions</h3>
           <div id="count-chips" class="chip-group" role="group" aria-label="Number of questions"></div>
+        </div>
+
+        <div id="repeat-section" class="setup-section" hidden>
+          <h3>Repeat each word</h3>
+          <div id="repeat-chips" class="chip-group" role="group" aria-label="How many times to play each word"></div>
         </div>
 
         <p id="pool-info" class="pool-info" aria-live="polite"></p>
@@ -206,6 +214,63 @@
       </div>
       <div class="quiz-actions">
         <button id="reading-exit-btn" class="btn btn-ghost btn-lg" type="button">Back to home</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== LISTEN SCREEN ===================== -->
+  <section id="screen-listen" class="screen" aria-labelledby="listen-heading" hidden>
+    <div class="panel listen-panel">
+      <div class="quiz-top">
+        <h2 id="listen-heading" class="sr-only">Listening session</h2>
+        <div class="quiz-top-left">
+          <p id="listen-progress-label" class="progress-label">Word 1 of 10</p>
+          <span id="listen-level-tag" class="level-tag">HSK 1</span>
+        </div>
+        <button id="listen-quit-btn" class="btn btn-ghost btn-sm" type="button">Stop</button>
+      </div>
+
+      <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-labelledby="listen-progress-label">
+        <div id="listen-progress-fill" class="progress-fill"></div>
+      </div>
+
+      <div class="listen-stage-pills" role="status" aria-live="polite">
+        <span id="listen-pill-zh" class="listen-pill">中文</span>
+        <span id="listen-pill-en" class="listen-pill">English</span>
+        <span id="listen-repeat-badge" class="listen-repeat-badge">Repeat 1/3</span>
+      </div>
+
+      <div class="listen-card">
+        <span id="listen-hanzi" class="listen-hanzi">电话</span>
+        <span id="listen-pinyin" class="listen-pinyin">diànhuà</span>
+        <span id="listen-meaning" class="listen-meaning">Telephone, phone call</span>
+        <span id="listen-secondary" class="listen-secondary">টেলিফোন</span>
+        <span id="listen-category-tag" class="listen-category-tag">Daily life</span>
+      </div>
+
+      <p id="listen-hint" class="play-hint">Playing continuously — it keeps going until you pause or stop.</p>
+
+      <div class="listen-controls">
+        <button id="listen-prev-btn" class="btn-round" type="button" aria-label="Previous word">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6v12M17 12 7 6v12l10-6Z" fill="currentColor"/></svg>
+        </button>
+        <button id="listen-playpause-btn" class="seal-btn" type="button" aria-label="Pause">
+          <span class="seal-ring"></span>
+          <svg id="listen-pause-icon" class="seal-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+            <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+          </svg>
+          <svg id="listen-play-icon" class="seal-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" hidden>
+            <path d="M7 5v14l12-7L7 5Z" fill="currentColor"/>
+          </svg>
+        </button>
+        <button id="listen-next-btn" class="btn-round" type="button" aria-label="Next word">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6v12M7 12l10-6v12L7 12Z" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="quiz-actions">
+        <button id="listen-home-btn" class="btn btn-ghost btn-lg" type="button">Back to home</button>
       </div>
     </div>
   </section>

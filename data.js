@@ -17,11 +17,54 @@ const OPTIONS_PER_QUESTION = 4;
 /** Question-count choices offered on the start screen. 'all' uses the entire filtered pool. */
 const QUESTION_COUNT_CHOICES = [10, 20, 30, 50, 'all'];
 
+/**
+ * "How many words" choices offered in Listen mode. Each one is a *slice* of the
+ * filtered pool (words 1-10, 10-20, 20-30, …) so the learner can drill one batch
+ * at a time instead of the whole list. `end: null` means "to the end of the pool".
+ */
+const LISTEN_RANGE_CHOICES = [
+  { id: '1-10',  label: '10',    start: 1,  end: 10 },
+  { id: '10-20', label: '10-20', start: 11, end: 20 },
+  { id: '20-30', label: '20-30', start: 21, end: 30 },
+  { id: '30-40', label: '30-40', start: 31, end: 40 },
+  { id: '40-50', label: '40-50', start: 41, end: 50 },
+  { id: 'all',   label: 'All',   start: 1,  end: null },
+];
+
+/** Listen mode starts on the first batch of ten. */
+const DEFAULT_LISTEN_RANGE_ID = '1-10';
+
+/** Looks up a Listen range by id, falling back to the first batch. */
+function listenRangeById(id) {
+  return LISTEN_RANGE_CHOICES.find((r) => r.id === id) || LISTEN_RANGE_CHOICES[0];
+}
+
+/** Returns the words of `pool` that fall inside `range` (1-based, inclusive). */
+function sliceByRange(pool, range) {
+  if (!range || range.id === 'all') return pool.slice();
+  const from = Math.max(0, range.start - 1);
+  const to = range.end == null ? pool.length : range.end;
+  return pool.slice(from, to);
+}
+
 /** Minimum words a filtered pool must contain to generate a valid exam (1 correct + 3 distractors). */
 const MIN_POOL_SIZE = OPTIONS_PER_QUESTION;
 
 /** Words shown per page in Reading mode. */
 const READING_PAGE_SIZE = 5;
+
+/** Folder holding Chinese audio (as stored on each word: e.g. "audio/电话.mp3"). */
+const AUDIO_ZH_PREFIX = 'audio/';
+
+/** Folder holding the matching English audio — same filename, different folder. */
+const AUDIO_EN_PREFIX = 'audioeng/';
+
+/** Folder holding the matching Bangla audio — same filename, different folder. */
+const AUDIO_BN_PREFIX = 'audiobng/';
+
+/** How-many-times-to-repeat choices offered for Listen mode. Default is 3. */
+const REPEAT_COUNT_CHOICES = [1, 2, 3, 5, 10];
+const DEFAULT_REPEAT_COUNT = 3;
 
 /** localStorage key for persisted lifetime stats. */
 const STATS_STORAGE_KEY = 'hskQuiz.stats.v1';
@@ -222,4 +265,54 @@ function buildExam(pool, count, order = 'random', language = 'bangla') {
 function buildReadingSession(pool, count, order = 'random') {
   const limit = Math.min(count, pool.length);
   return order === 'serial' ? pool.slice(0, limit) : shuffle(pool).slice(0, limit);
+}
+
+/**
+ * Builds a Listen session: the words inside `range` (a LISTEN_RANGE_CHOICES entry
+ * such as words 10-20), played back continuously by script.js — Chinese audio
+ * followed immediately by the Bangla or English audio, repeated.
+ * @param {Array} pool - filtered word list to draw from.
+ * @param {Object} range - which slice of the pool to study (see LISTEN_RANGE_CHOICES).
+ * @param {'random'|'serial'} [order='random'] - 'random' shuffles the batch; 'serial'
+ *   keeps the pool's original order.
+ * @returns {Array} words for the session.
+ */
+function buildListenSession(pool, range, order = 'random') {
+  const batch = sliceByRange(pool, range);
+  return order === 'serial' ? batch : shuffle(batch);
+}
+
+/** Path to a word's Chinese audio file (as stored in the database). */
+function zhAudioPath(word) {
+  return word && word.audio ? word.audio : null;
+}
+
+/** Bare audio filename for a word, with the Chinese folder prefix stripped off. */
+function audioFileName(word) {
+  if (!word || !word.audio) return null;
+  return word.audio.startsWith(AUDIO_ZH_PREFIX)
+    ? word.audio.slice(AUDIO_ZH_PREFIX.length)
+    : word.audio;
+}
+
+/** Path to a word's English audio file — same filename as the Chinese one, in AUDIO_EN_PREFIX. */
+function enAudioPath(word) {
+  const file = audioFileName(word);
+  return file ? AUDIO_EN_PREFIX + file : null;
+}
+
+/** Path to a word's Bangla audio file — same filename as the Chinese one, in AUDIO_BN_PREFIX. */
+function bnAudioPath(word) {
+  const file = audioFileName(word);
+  return file ? AUDIO_BN_PREFIX + file : null;
+}
+
+/**
+ * The meaning-side audio that should follow the Chinese clip, matching whichever
+ * language the learner picked on the start screen.
+ * @param {Object} word
+ * @param {'bangla'|'english'} [language='bangla']
+ */
+function meaningAudioPath(word, language = 'bangla') {
+  return language === 'bangla' ? bnAudioPath(word) : enAudioPath(word);
 }
